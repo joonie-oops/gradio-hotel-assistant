@@ -5,7 +5,7 @@ A small Gradio chatbot that plays the role of the Marina Vista Hotel receptionis
 ## Requirements
 
 - Python 3.11+
-- An OpenAI API key with access to `gpt-4.1-mini` (or update the model name in the script)
+- An OpenAI API key
 
 ## Setup
 
