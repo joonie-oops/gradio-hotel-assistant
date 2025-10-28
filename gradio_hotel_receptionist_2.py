@@ -4,6 +4,9 @@ from openai import OpenAI
 import gradio as gr
 import json
 import sqlite3
+import base64
+from io import BytesIO
+from PIL import Image
 
 # === Step 1: Load environment variables ===
 load_dotenv(override=True)
@@ -231,16 +234,37 @@ tools = [
 ]
 
 
-def respond(message, history):
+def talker(message):
+    response = client.audio.speech.create(
+        model="gpt-4o-mini-tts",
+        voice="onyx",  # Also, try replacing onyx with alloy or coral
+        input=message,
+    )
+    return response.content
+
+
+def artist(room_type):
+    image_response = client.images.generate(
+        model="gpt-image-1-mini",
+        prompt=f"A realistic, high-quality image of a {room_type} hotel room, showing the full interior design, furniture, lighting, and atmosphere that matches its description",
+        size="1024x1024",
+        n=1,
+    )
+    image_base64 = image_response.data[0].b64_json
+    image_data = base64.b64decode(image_base64)
+    return Image.open(BytesIO(image_data))
+
+
+def chat(history):
     messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+    generated_image = None
 
-    for user, assistant in history:
-        if user:
-            messages.append({"role": "user", "content": user})
-        if assistant:
-            messages.append({"role": "assistant", "content": assistant})
-
-    messages.append({"role": "user", "content": message})
+    # Add past messages
+    for entry in history:
+        role = entry.get("role")
+        content = entry.get("content")
+        if role and content:
+            messages.append({"role": role, "content": content})
 
     while True:
         response = client.chat.completions.create(
@@ -263,6 +287,17 @@ def respond(message, history):
                     result = get_room_details(**args)
                 elif name == "checkout_room":
                     result = checkout_room(**args)
+                    if "error" not in result:
+                        room_prompt = result.get("room") or args.get("room_type")
+                        if room_prompt:
+                            try:
+                                generated_image = artist(room_prompt)
+                            except Exception as image_error:
+                                generated_image = None
+                                result["image_error"] = (
+                                    f"Image generation failed: {image_error}"
+                                )
+
                 else:
                     result = {"error": f"Unknown tool: {name}"}
 
@@ -278,17 +313,34 @@ def respond(message, history):
             # Continue loop in case model chains multiple calls
             continue
 
-        # If no tool calls, final message reached
-        return message_obj.content
+        reply = response.choices[0].message.content
+        voice = talker(reply)
+
+        history += [{"role": "assistant", "content": reply}]
+
+        return history, voice, generated_image
 
 
-# === Step 4: Build Gradio Chat Interface ===
-chat = gr.ChatInterface(
-    fn=respond,
-    title="🏨 Marina Vista Hotel Receptionist",
-    description="Your friendly AI receptionist — here to help with bookings, amenities, and travel tips.",
-)
+def put_message_in_chatbot(message, history):
+    return "", history + [{"role": "user", "content": message}]
+
+
+with gr.Blocks() as ui:
+    with gr.Row():
+        chatbot = gr.Chatbot(height=500, type="messages")
+        image_output = gr.Image(height=500, interactive=False)
+    with gr.Row():
+        audio_output = gr.Audio(autoplay=True)
+    with gr.Row():
+        message = gr.Textbox(label="Chat with our AI Assistant:")
+
+    message.submit(
+        put_message_in_chatbot,
+        inputs=[message, chatbot],
+        outputs=[message, chatbot],
+    ).then(chat, inputs=chatbot, outputs=[chatbot, audio_output, image_output])
+
 
 # === Step 5: Launch ===
 if __name__ == "__main__":
-    chat.launch()
+    ui.launch(inbrowser=True)
