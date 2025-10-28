@@ -5,6 +5,7 @@ A small Gradio chatbot that plays the role of the Marina Vista Hotel receptionis
 ## Requirements
 
 - Python 3.11+
+- [uv](https://docs.astral.sh/uv/) package manager
 - An OpenAI API key
 
 ## Setup
@@ -14,23 +15,18 @@ A small Gradio chatbot that plays the role of the Marina Vista Hotel receptionis
    git clone git@github.com:joonie-oops/gradio-hotel-assistant.git
    cd gradio-hotel-assistant
    ```
-2. **Create a virtual environment (optional but recommended)**
+2. **Install dependencies with uv**
    ```bash
-   python -m venv .venv
-   source .venv/bin/activate
+   uv sync
    ```
-3. **Install dependencies**
-   ```bash
-   pip install -r requirements.txt
-   ```
-4. **Set your OpenAI credentials**  
+3. **Set your OpenAI credentials**  
    Create a `.env` file alongside the script:
    ```env
    OPENAI_API_KEY=sk-your-key
    ```
-5. **Run the app**
+4. **Run the app**
    ```bash
-   python gradio_hotel_receptionist_2.py
+   uv run python gradio_hotel_receptionist_2.py
    ```
 
 The app will create and seed `hotel.db` automatically the first time it runs. Gradio launches a local web UI where you can chat with the receptionist, get room details, and reserve rooms.
